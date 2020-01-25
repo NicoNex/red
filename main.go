@@ -1,29 +1,30 @@
 package main
 
 import (
-    "os"
-    "fmt"
-    "sync"
-    "flag"
-    "regexp"
-    "strings"
-    "io/ioutil"
+	"os"
+	"fmt"
+	"sync"
+	"flag"
+	"regexp"
+	"strings"
+	"io/ioutil"
 
-    "github.com/logrusorgru/aurora"
+	"github.com/logrusorgru/aurora"
 )
 
 var regex string
 var replacement string
+var maxdepth int
 var prnt bool
 var wg sync.WaitGroup
 
 func printErr(a interface{}) {
-    fmt.Println(aurora.Red(a).Bold())
+	fmt.Println(aurora.Red(a).Bold())
 }
 
 func die(a interface{}) {
-    printErr(a)
-    os.Exit(1)
+	printErr(a)
+	os.Exit(1)
 }
 
 func readDir(filename string) ([]os.FileInfo, error) {
@@ -36,82 +37,84 @@ func readDir(filename string) ([]os.FileInfo, error) {
 }
 
 func removeDuplicates(a []string) []string {
-    var ret []string
+	var ret []string
 
-    m := make(map[string]bool)
-    for _, v := range a {
-        if _, ok := m[v]; !ok {
-            m[v] = true
-            ret = append(ret, v)
-        }
-    }
-    return ret
+	m := make(map[string]bool)
+	for _, v := range a {
+		if _, ok := m[v]; !ok {
+			m[v] = true
+			ret = append(ret, v)
+		}
+	}
+	return ret
 }
 
 func findMatches(cnt string) []string {
-    re := regexp.MustCompile(regex)
-    matches := re.FindAllString(cnt, -1)
-    return removeDuplicates(matches)
+	re := regexp.MustCompile(regex)
+	matches := re.FindAllString(cnt, -1)
+	return removeDuplicates(matches)
 }
 
 func replace(in string, v ...string) string {
-    var elems []string
+	var elems []string
 
-    for _, s := range v {
-        elems = append(elems, s, replacement)
-    }
+	for _, s := range v {
+		elems = append(elems, s, replacement)
+	}
 
-    r := strings.NewReplacer(elems...)
-    return r.Replace(in)
+	r := strings.NewReplacer(elems...)
+	return r.Replace(in)
 }
 
 func writeFile(fpath string, content string) {
-    file, err := os.OpenFile(fpath, os.O_WRONLY, 0644)
-    if err != nil {
-        printErr(err)
-        return
-    }
-    defer file.Close()
-    if _, err := file.WriteString(content); err != nil {
-        printErr(err)
-    }
+	file, err := os.OpenFile(fpath, os.O_WRONLY, 0644)
+	if err != nil {
+		printErr(err)
+		return
+	}
+	defer file.Close()
+	if _, err := file.WriteString(content); err != nil {
+		printErr(err)
+	}
 }
 
 func edit(fpath string) {
-    defer wg.Done()
-    b, err := ioutil.ReadFile(fpath)
-    if err != nil {
-        printErr(err)
-        return
-    }
-
-    // TODO: calculate hash and compare to avoid useless I/O.
-    content := string(b)
-    matches := findMatches(content)
-    fmt.Println(matches)
-    if prnt {
-        fmt.Print(replace(content, matches...))
-    } else {
-        writeFile(fpath, replace(content, matches...))
-    }
-}
-
-// Recursively walks in a directory tree.
-func walkDir(root string) {
-	files, err := readDir(root)
+	defer wg.Done()
+	b, err := ioutil.ReadFile(fpath)
 	if err != nil {
 		printErr(err)
 		return
 	}
 
-	for _, finfo := range files {
-        fpath := fmt.Sprintf("%s%s", root, finfo.Name())
+	// TODO: calculate hash and compare to avoid useless I/O.
+	content := string(b)
+	matches := findMatches(content)
+	fmt.Println(matches)
+	if prnt {
+		fmt.Print(replace(content, matches...))
+	} else {
+		writeFile(fpath, replace(content, matches...))
+	}
+}
 
-        if finfo.IsDir() {
-            walkDir(fpath+"/")
-        } else {
-            wg.Add(1)
-            go edit(fpath)
+// Recursively walks in a directory tree.
+func walkDir(root string, depth int) {
+	if depth != maxdepth {
+		files, err := readDir(root)
+		if err != nil {
+			printErr(err)
+			return
+		}
+
+		for _, finfo := range files {
+			fpath := fmt.Sprintf("%s%s", root, finfo.Name())
+
+			if finfo.IsDir() {
+				walkDir(fpath+"/", depth+1)
+			} else {
+				wg.Add(1)
+				go edit(fpath)
+			}
 		}
 	}
 }
@@ -119,39 +122,59 @@ func walkDir(root string) {
 // Removes the './' from the beginning of directory names and
 // adds a '/' at the end if missing.
 func sanitise(name string) string {
-    if name != "." && name[:2] == "./" {
-        name = name[2:]
-    }
-    if name[len(name)-1] != '/' {
-        name += "/"
-    }
-    return name
+	if name != "." && name[:2] == "./" {
+		name = name[2:]
+	}
+	if name[len(name)-1] != '/' {
+		name += "/"
+	}
+	return name
+}
+
+func usage() {
+	var msg = `red - Recursive Editor
+Red allows you to replace all the substrings matched by a specified regex in one or more files.
+If it is given a directory as input, it will recursively replace the substrings in all the files of the directory.
+
+Usage:
+	%s [options] "regex" "replacement" input-files
+
+Options:
+	-p    Print to stdout instead of writing each file.
+	-l int
+		  Max depth in a directory tree.
+`
+	fmt.Printf(msg, os.Args[0])
 }
 
 func main() {
-    var inFile string
+	var files []string
 
-    flag.BoolVar(&prnt, "p", false, "Print to stdout")
-    flag.Parse()
+	flag.BoolVar(&prnt, "p", false, "Print to stdout")
+	flag.IntVar(&maxdepth, "l", -1, "Max depth")
+	flag.Usage = usage
+	flag.Parse()
 
-    if flag.NArg() >= 3 {
-        regex = flag.Arg(0)
-        replacement = flag.Arg(1)
-        inFile = flag.Arg(2)
-    } else {
-        die("not enough arguments specified")
-    }
+	if flag.NArg() >= 3 {
+		regex = flag.Arg(0)
+		replacement = flag.Arg(1)
+		files = flag.Args()[2:]
+	} else {
+		die("not enough arguments specified")
+	}
 
-    finfo, err := os.Stat(inFile)
-    if err != nil {
-        die(err)
-    }
+	for _, f := range files {
+		finfo, err := os.Stat(f)
+		if err != nil {
+			die(err)
+		}
 
-    if finfo.IsDir() {
-        walkDir(sanitise(inFile))
-    } else {
-        wg.Add(1)
-        go edit(inFile)
-    }
-    wg.Wait()
+		if finfo.IsDir() {
+			walkDir(sanitise(f), 0)
+		} else {
+			wg.Add(1)
+			go edit(f)
+		}
+		wg.Wait()
+	}
 }
