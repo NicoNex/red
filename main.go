@@ -8,8 +8,6 @@ import (
 	"regexp"
 	"strings"
 	"io/ioutil"
-
-	"github.com/logrusorgru/aurora"
 )
 
 var regex string
@@ -18,12 +16,8 @@ var maxdepth int
 var prnt bool
 var wg sync.WaitGroup
 
-func printErr(a interface{}) {
-	fmt.Println(aurora.Red(a).Bold())
-}
-
 func die(a interface{}) {
-	printErr(a)
+	fmt.Println(a)
 	os.Exit(1)
 }
 
@@ -69,12 +63,12 @@ func replace(in string, v ...string) string {
 func writeFile(fpath string, content string) {
 	file, err := os.OpenFile(fpath, os.O_WRONLY, 0644)
 	if err != nil {
-		printErr(err)
+		fmt.Println(err)
 		return
 	}
 	defer file.Close()
 	if _, err := file.WriteString(content); err != nil {
-		printErr(err)
+		fmt.Println(err)
 	}
 }
 
@@ -82,14 +76,13 @@ func edit(fpath string) {
 	defer wg.Done()
 	b, err := ioutil.ReadFile(fpath)
 	if err != nil {
-		printErr(err)
+		fmt.Println(err)
 		return
 	}
 
 	// TODO: calculate hash and compare to avoid useless I/O.
 	content := string(b)
 	matches := findMatches(content)
-	fmt.Println(matches)
 	if prnt {
 		fmt.Print(replace(content, matches...))
 	} else {
@@ -102,7 +95,7 @@ func walkDir(root string, depth int) {
 	if depth != maxdepth {
 		files, err := readDir(root)
 		if err != nil {
-			printErr(err)
+			fmt.Println(err)
 			return
 		}
 
@@ -117,18 +110,6 @@ func walkDir(root string, depth int) {
 			}
 		}
 	}
-}
-
-// Removes the './' from the beginning of directory names and
-// adds a '/' at the end if missing.
-func sanitise(name string) string {
-	if name != "." && name[:2] == "./" {
-		name = name[2:]
-	}
-	if name[len(name)-1] != '/' {
-		name += "/"
-	}
-	return name
 }
 
 func usage() {
@@ -147,6 +128,7 @@ Options:
 	fmt.Printf(msg, os.Args[0])
 }
 
+// TODO: add hidden flag
 func main() {
 	var files []string
 
@@ -159,6 +141,10 @@ func main() {
 		regex = flag.Arg(0)
 		replacement = flag.Arg(1)
 		files = flag.Args()[2:]
+	} else if flag.NArg() == 2 {
+		regex = flag.Arg(0)
+		replacement = flag.Arg(1)
+		files = []string{"./"}
 	} else {
 		die("not enough arguments specified")
 	}
@@ -170,7 +156,7 @@ func main() {
 		}
 
 		if finfo.IsDir() {
-			walkDir(sanitise(f), 0)
+			walkDir(f, 0)
 		} else {
 			wg.Add(1)
 			go edit(f)
