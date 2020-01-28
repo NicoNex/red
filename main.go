@@ -10,11 +10,12 @@ import (
 	"io/ioutil"
 )
 
-var regex string
-var replacement string
-var maxdepth int
 var prnt bool
+var regex string
+var maxdepth int
+var editHidden bool
 var wg sync.WaitGroup
+var replacement string
 
 func die(a interface{}) {
 	fmt.Println(a)
@@ -60,18 +61,6 @@ func replace(in string, v ...string) string {
 	return r.Replace(in)
 }
 
-func writeFile(fpath string, content string) {
-	file, err := os.OpenFile(fpath, os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer file.Close()
-	if _, err := file.WriteString(content); err != nil {
-		fmt.Println(err)
-	}
-}
-
 func edit(fpath string) {
 	defer wg.Done()
 	b, err := ioutil.ReadFile(fpath)
@@ -79,14 +68,14 @@ func edit(fpath string) {
 		fmt.Println(err)
 		return
 	}
-
-	// TODO: calculate hash and compare to avoid useless I/O.
 	content := string(b)
 	matches := findMatches(content)
+
 	if prnt {
 		fmt.Print(replace(content, matches...))
-	} else {
-		writeFile(fpath, replace(content, matches...))
+	} else if len(matches) > 0 {
+		tmp := replace(content, matches...)
+		ioutil.WriteFile(fpath, []byte(tmp), 0644)
 	}
 }
 
@@ -100,13 +89,16 @@ func walkDir(root string, depth int) {
 		}
 
 		for _, finfo := range files {
-			fpath := fmt.Sprintf("%s%s", root, finfo.Name())
+			fname := finfo.Name()
+			fpath := fmt.Sprintf("%s%s", root, fname)
 
-			if finfo.IsDir() {
-				walkDir(fpath+"/", depth+1)
-			} else {
-				wg.Add(1)
-				go edit(fpath)
+			if fname[0] != '.' || editHidden {
+				if finfo.IsDir() {
+					walkDir(fpath+"/", depth+1)
+				} else {
+					wg.Add(1)
+					go edit(fpath)
+				}
 			}
 		}
 	}
@@ -118,12 +110,13 @@ Red allows you to replace all the substrings matched by a specified regex in one
 If it is given a directory as input, it will recursively replace the substrings in all the files of the directory.
 
 Usage:
-	%s [options] "regex" "replacement" input-files
+    %s [options] "regex" "replacement" input-files
 
 Options:
-	-p    Print to stdout instead of writing each file.
-	-l int
-		  Max depth in a directory tree.
+    -p    Print to stdout instead of writing each file.
+    -d    Includes hidden files (starting with a dot).
+    -l int
+          Max depth in a directory tree.
 `
 	fmt.Printf(msg, os.Args[0])
 }
@@ -133,6 +126,7 @@ func main() {
 	var files []string
 
 	flag.BoolVar(&prnt, "p", false, "Print to stdout")
+	flag.BoolVar(&editHidden, "d", false, "Includes hidden files (starting with a dot).")
 	flag.IntVar(&maxdepth, "l", -1, "Max depth")
 	flag.Usage = usage
 	flag.Parse()
