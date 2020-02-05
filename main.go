@@ -35,7 +35,6 @@ func replace(src string) string {
 	if err != nil {
 		die(err)
 	}
-
 	return re.ReplaceAllString(src, replacement)
 }
 
@@ -46,15 +45,11 @@ func edit(fpath string) {
 		fmt.Println(err)
 		return
 	}
-	
 	content := string(b)
-	if match, _ := regexp.MatchString(regex, content); match {
-		tmp := replace(content)
-		if prnt {
-			fmt.Print(tmp)
-		} else {
-			ioutil.WriteFile(fpath, []byte(tmp), 0644)
-		}
+	if prnt {
+		fmt.Print(replace(content))
+	} else if ok, _ := regexp.Match(regex, b); ok {
+		ioutil.WriteFile(fpath, []byte(replace(content)), 0644)
 	}
 }
 
@@ -100,12 +95,13 @@ Options:
 	fmt.Printf(msg, os.Args[0])
 }
 
+// TODO: add hidden flag
 func main() {
 	var files []string
 
-	flag.BoolVar(&prnt, "p", false, "Print to stdout.")
+	flag.BoolVar(&prnt, "p", false, "Print to stdout")
 	flag.BoolVar(&editHidden, "d", false, "Includes hidden files (starting with a dot).")
-	flag.IntVar(&maxdepth, "l", -1, "Max depth.")
+	flag.IntVar(&maxdepth, "l", -1, "Max depth")
 	flag.Usage = usage
 	flag.Parse()
 
