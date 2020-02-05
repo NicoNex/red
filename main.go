@@ -6,7 +6,6 @@ import (
 	"sync"
 	"flag"
 	"regexp"
-	"strings"
 	"io/ioutil"
 )
 
@@ -31,34 +30,13 @@ func readDir(filename string) ([]os.FileInfo, error) {
 	return file.Readdir(-1)
 }
 
-func removeDuplicates(a []string) []string {
-	var ret []string
-
-	m := make(map[string]bool)
-	for _, v := range a {
-		if _, ok := m[v]; !ok {
-			m[v] = true
-			ret = append(ret, v)
-		}
-	}
-	return ret
-}
-
-func findMatches(cnt string) []string {
-	re := regexp.MustCompile(regex)
-	matches := re.FindAllString(cnt, -1)
-	return removeDuplicates(matches)
-}
-
-func replace(in string, v ...string) string {
-	var elems []string
-
-	for _, s := range v {
-		elems = append(elems, s, replacement)
+func replace(src string) string {
+	re, err := regexp.Compile(regex)
+	if err != nil {
+		die(err)
 	}
 
-	r := strings.NewReplacer(elems...)
-	return r.Replace(in)
+	return re.ReplaceAllString(src, replacement)
 }
 
 func edit(fpath string) {
@@ -68,14 +46,15 @@ func edit(fpath string) {
 		fmt.Println(err)
 		return
 	}
+	
 	content := string(b)
-	matches := findMatches(content)
-
-	if prnt {
-		fmt.Print(replace(content, matches...))
-	} else if len(matches) > 0 {
-		tmp := replace(content, matches...)
-		ioutil.WriteFile(fpath, []byte(tmp), 0644)
+	if match, _ := regexp.MatchString(regex, content); match {
+		tmp := replace(content)
+		if prnt {
+			fmt.Print(tmp)
+		} else {
+			ioutil.WriteFile(fpath, []byte(tmp), 0644)
+		}
 	}
 }
 
@@ -121,13 +100,12 @@ Options:
 	fmt.Printf(msg, os.Args[0])
 }
 
-// TODO: add hidden flag
 func main() {
 	var files []string
 
-	flag.BoolVar(&prnt, "p", false, "Print to stdout")
+	flag.BoolVar(&prnt, "p", false, "Print to stdout.")
 	flag.BoolVar(&editHidden, "d", false, "Includes hidden files (starting with a dot).")
-	flag.IntVar(&maxdepth, "l", -1, "Max depth")
+	flag.IntVar(&maxdepth, "l", -1, "Max depth.")
 	flag.Usage = usage
 	flag.Parse()
 
