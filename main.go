@@ -10,11 +10,11 @@ import (
 )
 
 var prnt bool
-var regex string
+var repl string
 var maxdepth int
+var pattern string
 var editHidden bool
 var wg sync.WaitGroup
-var replacement string
 
 func die(a interface{}) {
 	fmt.Println(a)
@@ -31,11 +31,11 @@ func readDir(filename string) ([]os.FileInfo, error) {
 }
 
 func replace(src string) string {
-	re, err := regexp.Compile(regex)
+	re, err := regexp.Compile(pattern)
 	if err != nil {
 		die(err)
 	}
-	return re.ReplaceAllString(src, replacement)
+	return re.ReplaceAllString(src, repl)
 }
 
 func edit(fpath string) {
@@ -48,7 +48,7 @@ func edit(fpath string) {
 	content := string(b)
 	if prnt {
 		fmt.Print(replace(content))
-	} else if ok, _ := regexp.Match(regex, b); ok {
+	} else if ok, _ := regexp.Match(pattern, b); ok {
 		ioutil.WriteFile(fpath, []byte(replace(content)), 0644)
 	}
 }
@@ -95,7 +95,6 @@ Options:
 	fmt.Printf(msg, os.Args[0])
 }
 
-// TODO: add hidden flag
 func main() {
 	var files []string
 
@@ -106,15 +105,12 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() >= 3 {
-		regex = flag.Arg(0)
-		replacement = flag.Arg(1)
+		pattern = flag.Arg(0)
+		repl = flag.Arg(1)
 		files = flag.Args()[2:]
-	} else if flag.NArg() == 2 {
-		regex = flag.Arg(0)
-		replacement = flag.Arg(1)
-		files = []string{"./"}
 	} else {
-		die("not enough arguments specified")
+		usage()
+		return
 	}
 
 	for _, f := range files {
