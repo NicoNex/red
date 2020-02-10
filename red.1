@@ -1,0 +1,36 @@
+.\" Manpage for red.
+.\" Contact nicolo.santamaria@gmail.com for bug reports.
+.TH red 1 "10-02-2020" "red man page"
+
+.SH NAME
+red \- Recursive editor.
+
+.SH SYNOPSIS
+.B red [OPTIONS] "pattern" "replacement" filename
+
+.SH DESCRIPTION
+Red \- Recursive editor.
+.PP
+Red will recursively replace all the matches in the files of a directory tree with the provided replacement.
+
+.SH OPTIONS
+.B "-p"
+    Print to stdout instead of writing each file.
+
+.B "-v"
+    Verbose, explain what is being done.
+
+.B "-g"
+    Add a glob the file names must match to be edited.
+
+.B "-a"
+    Includes hidden files (starting with a dot).
+
+.B "-l"
+    Max depth in a directory tree (default -1).
+
+.B "-h"
+    Prints the help message.
+
+.SH AUTHOR
+Nicolò Santamaria <nicolo.santamaria@gmail.com>
