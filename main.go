@@ -14,7 +14,7 @@ var prnt bool
 var repl string
 var glob string
 var maxdepth int
-var editHidden bool
+var allFiles bool
 var wg sync.WaitGroup
 var re *regexp.Regexp
 
@@ -70,7 +70,7 @@ func walkDir(root string, depth int) {
 			fname := finfo.Name()
 			fpath := fmt.Sprintf("%s%s", root, fname)
 
-			if fname[0] != '.' || editHidden {
+			if fname[0] != '.' || allFiles {
 				if finfo.IsDir() {
 					walkDir(fpath+"/", depth+1)
 				} else {
@@ -87,18 +87,19 @@ func walkDir(root string, depth int) {
 func usage() {
 	var msg = `red - Recursive Editor
 Red allows you to replace all the substrings matched by a specified regex in one or more files.
-If it is given a directory as input, it will recursively replace the substrings in all the files of the directory.
+If it is given a directory as input, it will recursively replace all the matches in the files of the directory tree.
 
 Usage:
-    %s [options] "regex" "replacement" input-files
+    %s [options] "pattern" "replacement" input-files
 
 Options:
     -p    Print to stdout instead of writing each file.
     -g string 
           Add a glob the file names must match to be edited.
-    -d    Includes hidden files (starting with a dot).
+    -a    Includes hidden files (starting with a dot).
     -l int
           Max depth in a directory tree.
+    -h    Prints this help message.
 `
 	fmt.Printf(msg, os.Args[0])
 }
@@ -109,7 +110,7 @@ func main() {
 
 	flag.BoolVar(&prnt, "p", false, "Print to stdout.")
 	flag.StringVar(&glob, "g", "", "Add a pattern the file names must match to be edited.")
-	flag.BoolVar(&editHidden, "d", false, "Includes hidden files (starting with a dot).")
+	flag.BoolVar(&allFiles, "a", false, "Includes hidden files (starting with a dot).")
 	flag.IntVar(&maxdepth, "l", -1, "Max depth.")
 	flag.Usage = usage
 	flag.Parse()
