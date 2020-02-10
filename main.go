@@ -13,6 +13,7 @@ import (
 var prnt bool
 var repl string
 var glob string
+var verbose bool
 var maxdepth int
 var allFiles bool
 var wg sync.WaitGroup
@@ -53,6 +54,9 @@ func edit(fpath string) {
 	if prnt {
 		fmt.Print(string(tmp))
 	} else if re.Match(b) {
+		if verbose {
+			fmt.Printf("Writing %s\n", fpath)
+		}
 		ioutil.WriteFile(fpath, tmp, 0644)
 	}
 }
@@ -94,7 +98,8 @@ Usage:
 
 Options:
     -p    Print to stdout instead of writing each file.
-    -g string 
+    -v    Verbose, explain what is being done.
+    -g string
           Add a glob the file names must match to be edited.
     -a    Includes hidden files (starting with a dot).
     -l int
@@ -109,6 +114,7 @@ func main() {
 	var files []string
 
 	flag.BoolVar(&prnt, "p", false, "Print to stdout.")
+	flag.BoolVar(&verbose, "v", false, "Verbose, explain what is being done.")
 	flag.StringVar(&glob, "g", "", "Add a pattern the file names must match to be edited.")
 	flag.BoolVar(&allFiles, "a", false, "Includes hidden files (starting with a dot).")
 	flag.IntVar(&maxdepth, "l", -1, "Max depth.")
