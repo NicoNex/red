@@ -7,14 +7,16 @@ import (
 	"flag"
 	"regexp"
 	"io/ioutil"
+	"path/filepath"
 )
 
 var prnt bool
 var repl string
+var glob string
 var maxdepth int
-var pattern string
 var editHidden bool
 var wg sync.WaitGroup
+var re *regexp.Regexp
 
 func die(a interface{}) {
 	fmt.Println(a)
@@ -30,26 +32,28 @@ func readDir(filename string) ([]os.FileInfo, error) {
 	return file.Readdir(-1)
 }
 
-func replace(src string) string {
-	re, err := regexp.Compile(pattern)
+func matchGlob(fname string) bool {
+	ok, err := filepath.Match(glob, fname)
 	if err != nil {
-		die(err)
+		fmt.Println(err)
 	}
-	return re.ReplaceAllString(src, repl)
+	return ok
 }
 
 func edit(fpath string) {
 	defer wg.Done()
+
 	b, err := ioutil.ReadFile(fpath)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	content := string(b)
+
+	tmp := re.ReplaceAll(b, []byte(repl))
 	if prnt {
-		fmt.Print(replace(content))
-	} else if ok, _ := regexp.Match(pattern, b); ok {
-		ioutil.WriteFile(fpath, []byte(replace(content)), 0644)
+		fmt.Print(string(tmp))
+	} else if re.Match(b) {
+		ioutil.WriteFile(fpath, tmp, 0644)
 	}
 }
 
@@ -70,8 +74,10 @@ func walkDir(root string, depth int) {
 				if finfo.IsDir() {
 					walkDir(fpath+"/", depth+1)
 				} else {
-					wg.Add(1)
-					go edit(fpath)
+					if glob == "" || matchGlob(fpath) {
+						wg.Add(1)
+						go edit(fpath)
+					}
 				}
 			}
 		}
@@ -88,6 +94,8 @@ Usage:
 
 Options:
     -p    Print to stdout instead of writing each file.
+    -g string 
+          Add a glob the file names must match to be edited.
     -d    Includes hidden files (starting with a dot).
     -l int
           Max depth in a directory tree.
@@ -96,11 +104,13 @@ Options:
 }
 
 func main() {
+	var pattern string
 	var files []string
 
-	flag.BoolVar(&prnt, "p", false, "Print to stdout")
+	flag.BoolVar(&prnt, "p", false, "Print to stdout.")
+	flag.StringVar(&glob, "g", "", "Add a pattern the file names must match to be edited.")
 	flag.BoolVar(&editHidden, "d", false, "Includes hidden files (starting with a dot).")
-	flag.IntVar(&maxdepth, "l", -1, "Max depth")
+	flag.IntVar(&maxdepth, "l", -1, "Max depth.")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -112,6 +122,12 @@ func main() {
 		usage()
 		return
 	}
+
+	regex, err := regexp.Compile(pattern)
+	if err!= nil {
+		die(err)
+	}
+	re = regex
 
 	for _, f := range files {
 		finfo, err := os.Stat(f)
