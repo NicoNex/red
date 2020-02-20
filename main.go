@@ -72,11 +72,11 @@ func walkDir(root string, depth int) {
 
 		for _, finfo := range files {
 			fname := finfo.Name()
-			fpath := fmt.Sprintf("%s%s", root, fname)
+			fpath := filepath.Join(root, fname)
 
 			if fname[0] != '.' || allFiles {
 				if finfo.IsDir() {
-					walkDir(fpath+"/", depth+1)
+					walkDir(fpath, depth+1)
 				} else {
 					if glob == "" || matchGlob(fpath) {
 						wg.Add(1)
