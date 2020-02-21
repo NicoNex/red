@@ -1,13 +1,14 @@
 package main
 
 import (
-	"os"
-	"fmt"
-	"sync"
 	"flag"
-	"regexp"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
+	"sync"
 )
 
 var prnt bool
@@ -34,14 +35,22 @@ func readDir(filename string) ([]os.FileInfo, error) {
 }
 
 func matchGlob(fname string) bool {
+	if runtime.GOOS == "windows" {
+		re := regexp.MustCompile(`[^\\]+$`)
+		fname = re.FindString(fname)
+	}
+
 	ok, err := filepath.Match(glob, fname)
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	return ok
 }
 
 func edit(fpath string) {
+	var match = make(chan bool, 1)
+
 	defer wg.Done()
 
 	b, err := ioutil.ReadFile(fpath)
@@ -50,15 +59,22 @@ func edit(fpath string) {
 		return
 	}
 
+	if !prnt {
+		go func(cont []byte, ch chan bool) {
+			ch <- re.Match(cont)
+		}(b, match)
+	}
+
 	tmp := re.ReplaceAll(b, []byte(repl))
 	if prnt {
 		fmt.Print(string(tmp))
-	} else if re.Match(b) {
+	} else if <-match {
 		if verbose {
 			fmt.Printf("Writing %s\n", fpath)
 		}
 		ioutil.WriteFile(fpath, tmp, 0644)
 	}
+	close(match)
 }
 
 // Recursively walks in a directory tree.
@@ -131,7 +147,7 @@ func main() {
 	}
 
 	regex, err := regexp.Compile(pattern)
-	if err!= nil {
+	if err != nil {
 		die(err)
 	}
 	re = regex
