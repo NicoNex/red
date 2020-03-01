@@ -10,8 +10,14 @@ red \- Recursive editor.
 
 .SH DESCRIPTION
 Red \- Recursive editor.
-.PP
-Red will recursively replace all the matches in the files of a directory tree with the provided replacement.
+.P
+Red is a fast and intuitive find & replace cli.
+.P
+Red replaces all matches of a specified regex with the provided replacement text.
+.P
+It can be run over single files or entire directories specified in the command line argument.
+.P
+When red encounters a directory it recursively finds and replaces text in all the files in the directory tree.
 
 .SH OPTIONS
 .B "-p"
