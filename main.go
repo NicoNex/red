@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,7 +14,7 @@ import (
 )
 
 var prnt bool
-var repl string
+var repl []byte
 var glob string
 var verbose bool
 var maxdepth int
@@ -50,7 +52,6 @@ func matchGlob(fname string) bool {
 
 func edit(fpath string) {
 	var match = make(chan bool, 1)
-
 	defer wg.Done()
 
 	b, err := ioutil.ReadFile(fpath)
@@ -65,7 +66,7 @@ func edit(fpath string) {
 		}(b, match)
 	}
 
-	tmp := re.ReplaceAll(b, []byte(repl))
+	tmp := re.ReplaceAll(b, repl)
 	if prnt {
 		fmt.Print(string(tmp))
 	} else if <-match {
@@ -75,6 +76,19 @@ func edit(fpath string) {
 		ioutil.WriteFile(fpath, tmp, 0644)
 	}
 	close(match)
+}
+
+func editStdin() {
+	var reader = bufio.NewReader(os.Stdin)
+
+	b, err := reader.ReadBytes(0)
+	if err != nil && err != io.EOF {
+		fmt.Println(err)
+		return
+	}
+
+	o := re.ReplaceAll(b, repl)
+	fmt.Print(string(o))
 }
 
 // Recursively walks in a directory tree.
@@ -139,7 +153,7 @@ func main() {
 
 	if flag.NArg() >= 3 {
 		pattern = flag.Arg(0)
-		repl = flag.Arg(1)
+		repl = []byte(flag.Arg(1))
 		files = flag.Args()[2:]
 	} else {
 		usage()
@@ -153,6 +167,11 @@ func main() {
 	re = regex
 
 	for _, f := range files {
+		if f == "-" {
+			editStdin()
+			continue
+		}
+
 		finfo, err := os.Stat(f)
 		if err != nil {
 			die(err)
