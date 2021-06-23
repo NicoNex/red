@@ -1,3 +1,5 @@
+[![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/) [![Go Report Card](https://goreportcard.com/badge/github.com/NicoNex/red)](https://goreportcard.com/report/github.com/NicoNex/red) [![License](http://img.shields.io/badge/license-GPL3.0-orange.svg?style=flat)](https://github.com/NicoNex/re/blob/master/LICENSE)
+
 # red
 Recursive Editor
 
