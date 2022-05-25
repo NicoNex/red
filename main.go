@@ -5,27 +5,22 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sync"
 )
 
-var prnt bool
-var repl []byte
-var glob string
-var verbose bool
-var maxdepth int
-var allFiles bool
-var wg sync.WaitGroup
-var re *regexp.Regexp
-
-func die(a interface{}) {
-	fmt.Println(a)
-	os.Exit(1)
-}
+var (
+	prnt     bool
+	repl     []byte
+	glob     string
+	verbose  bool
+	maxdepth int
+	allFiles bool
+	wg       sync.WaitGroup
+	re       *regexp.Regexp
+)
 
 func readDir(filename string) ([]os.FileInfo, error) {
 	file, err := os.Open(filename)
@@ -37,45 +32,33 @@ func readDir(filename string) ([]os.FileInfo, error) {
 }
 
 func matchGlob(fname string) bool {
-	if runtime.GOOS == "windows" {
-		re := regexp.MustCompile(`[^\\]+$`)
-		fname = re.FindString(fname)
-	}
-
-	ok, err := filepath.Match(glob, fname)
+	ok, err := filepath.Match(glob, filepath.Base(fname))
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	return ok
 }
 
 func edit(fpath string) {
-	var match = make(chan bool, 1)
 	defer wg.Done()
 
-	b, err := ioutil.ReadFile(fpath)
+	b, err := os.ReadFile(fpath)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	if !prnt {
-		go func(cont []byte, ch chan bool) {
-			ch <- re.Match(cont)
-		}(b, match)
-	}
-
 	tmp := re.ReplaceAll(b, repl)
 	if prnt {
 		fmt.Print(string(tmp))
-	} else if <-match {
+	} else if re.Match(b) {
 		if verbose {
 			fmt.Printf("Writing %s\n", fpath)
 		}
-		ioutil.WriteFile(fpath, tmp, 0644)
+		if err := os.WriteFile(fpath, tmp, 0644); err != nil {
+			fmt.Println(err)
+		}
 	}
-	close(match)
 }
 
 func editStdin() {
@@ -86,14 +69,12 @@ func editStdin() {
 		fmt.Println(err)
 		return
 	}
-
-	o := re.ReplaceAll(b, repl)
-	fmt.Print(string(o))
+	fmt.Print(string(re.ReplaceAll(b, repl)))
 }
 
 // Recursively walks in a directory tree.
 func walkDir(root string, depth int) {
-	if depth != maxdepth {
+	if depth < maxdepth {
 		files, err := readDir(root)
 		if err != nil {
 			fmt.Println(err)
@@ -139,10 +120,7 @@ Options:
 	fmt.Printf(msg, os.Args[0])
 }
 
-func main() {
-	var pattern string
-	var files []string
-
+func parseFlags() {
 	flag.BoolVar(&prnt, "p", false, "Print to stdout.")
 	flag.BoolVar(&verbose, "v", false, "Verbose, explain what is being done.")
 	flag.StringVar(&glob, "g", "", "Add a pattern the file names must match to be edited.")
@@ -150,6 +128,15 @@ func main() {
 	flag.IntVar(&maxdepth, "l", -1, "Max depth.")
 	flag.Usage = usage
 	flag.Parse()
+}
+
+func main() {
+	var (
+		pattern string
+		files   []string
+	)
+
+	parseFlags()
 
 	if flag.NArg() >= 3 {
 		pattern = flag.Arg(0)
@@ -162,7 +149,8 @@ func main() {
 
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		die(err)
+		fmt.Println(err)
+		return
 	}
 	re = regex
 
@@ -174,7 +162,8 @@ func main() {
 
 		finfo, err := os.Stat(f)
 		if err != nil {
-			die(err)
+			fmt.Println(err)
+			return
 		}
 
 		if finfo.IsDir() {
