@@ -101,8 +101,10 @@ func walkDir(root string, depth int) {
 
 func usage() {
 	var msg = `red - Recursive Editor
-Red allows you to replace all the substrings matched by a specified regex in one or more files.
-If it is given a directory as input, it will recursively replace all the matches in the files of the directory tree.
+Red allows you to replace all the substrings matched by a specified regex in
+one or more files.
+If it is given a directory as input, it will recursively replace all the
+matches in the files of the directory tree.
 
 Usage:
     %s [options] "pattern" "replacement" input-files
