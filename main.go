@@ -74,7 +74,7 @@ func editStdin() {
 
 // Recursively walks in a directory tree.
 func walkDir(root string, depth int) {
-	if depth < maxdepth {
+	if depth != 0 {
 		files, err := readDir(root)
 		if err != nil {
 			fmt.Println(err)
@@ -87,7 +87,7 @@ func walkDir(root string, depth int) {
 
 			if fname[0] != '.' || allFiles {
 				if finfo.IsDir() {
-					walkDir(fpath, depth+1)
+					walkDir(fpath, depth-1)
 				} else {
 					if glob == "" || matchGlob(fpath) {
 						wg.Add(1)
@@ -136,6 +136,7 @@ func main() {
 		files   []string
 	)
 
+	parseFlags()
 	if flag.NArg() >= 3 {
 		pattern = flag.Arg(0)
 		repl = []byte(flag.Arg(1))
@@ -165,7 +166,7 @@ func main() {
 		}
 
 		if finfo.IsDir() {
-			walkDir(f, 0)
+			walkDir(f, maxdepth)
 		} else {
 			wg.Add(1)
 			go edit(f)
